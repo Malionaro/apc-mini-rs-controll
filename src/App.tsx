@@ -9,6 +9,7 @@ import { Inspector } from "./components/Inspector";
 import { SettingsView } from "./components/SettingsView";
 import { LogsView } from "./components/LogsView";
 import { createEmptyMapping, type Action, type AppConfig, type Mapping } from "./types";
+import { checkForUpdate, installUpdate, type UpdateStatus } from "./updater";
 
 function App() {
   const [config, setConfig] = useState<AppConfig | null>(null);
@@ -24,6 +25,8 @@ function App() {
   const [showNewPageInput, setShowNewPageInput] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [midiOutputPorts, setMidiOutputPorts] = useState<string[]>([]);
+  const [updateInfo, setUpdateInfo] = useState<UpdateStatus | null>(null);
+  const [updateProgress, setUpdateProgress] = useState<number | null>(null);
   
   const logEndRef = useRef<HTMLDivElement | null>(null);
   const autoSelectRef = useRef(autoSelect);
@@ -49,6 +52,14 @@ function App() {
       }
       if (isLogsWindow) {
         await fetchLogs();
+      }
+
+      // Auto-update check on startup (main window only)
+      if (!isSettingsWindow && !isLogsWindow) {
+        const status = await checkForUpdate();
+        if (status.available) {
+          setUpdateInfo(status);
+        }
       }
 
       unlistenLog = await listen<string>("new-log", (event) => {
@@ -407,6 +418,41 @@ function App() {
   return (
     <div className="container">
       {toast ? <div className="toast">{toast}</div> : null}
+
+      {updateInfo?.available && (
+        <div className="update-banner">
+          <div className="update-banner-content">
+            <span className="update-icon">🚀</span>
+            <span>
+              <strong>Update verfügbar: v{updateInfo.version}</strong>
+              {updateInfo.body ? <span className="update-body"> — {updateInfo.body}</span> : null}
+            </span>
+          </div>
+          <div className="update-banner-actions">
+            {updateProgress !== null ? (
+              <div className="update-progress">
+                <div className="update-progress-bar" style={{ width: `${updateProgress}%` }} />
+                <span>{updateProgress}%</span>
+              </div>
+            ) : (
+              <>
+                <button
+                  className="update-btn install"
+                  onClick={() => {
+                    setUpdateProgress(0);
+                    void installUpdate((p) => setUpdateProgress(p));
+                  }}
+                >
+                  Jetzt installieren
+                </button>
+                <button className="update-btn dismiss" onClick={() => setUpdateInfo(null)}>
+                  Später
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="left-panel">
         <div className="header">
