@@ -158,6 +158,46 @@ fn set_active_page(page_name: String, state: State<'_, Arc<MidiState>>) -> Resul
 }
 
 #[tauri::command]
+async fn download_and_install_update(download_url: String, filename: String) -> Result<(), String> {
+    use std::path::PathBuf;
+    use tokio::io::AsyncWriteExt;
+
+    // Download to temp dir
+    let temp_dir = std::env::temp_dir();
+    let dest_path: PathBuf = temp_dir.join(&filename);
+
+    let response = reqwest::get(&download_url)
+        .await
+        .map_err(|e| format!("Download fehlgeschlagen: {}", e))?;
+
+    if !response.status().is_success() {
+        return Err(format!("Server Fehler: {}", response.status()));
+    }
+
+    let bytes = response.bytes()
+        .await
+        .map_err(|e| format!("Lesen fehlgeschlagen: {}", e))?;
+
+    let mut file = tokio::fs::File::create(&dest_path)
+        .await
+        .map_err(|e| format!("Datei erstellen fehlgeschlagen: {}", e))?;
+
+    file.write_all(&bytes)
+        .await
+        .map_err(|e| format!("Schreiben fehlgeschlagen: {}", e))?;
+
+    file.flush().await.map_err(|e| e.to_string())?;
+    drop(file);
+
+    // Launch installer and exit app
+    std::process::Command::new(&dest_path)
+        .spawn()
+        .map_err(|e| format!("Installer starten fehlgeschlagen: {}", e))?;
+
+    std::process::exit(0);
+}
+
+#[tauri::command]
 async fn fetch_config(url: String, state: State<'_, Arc<MidiState>>) -> Result<AppConfig, String> {
     let resp = reqwest::get(&url)
         .await
@@ -251,7 +291,6 @@ pub fn run() {
         })
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .invoke_handler(tauri::generate_handler![
             get_config,
@@ -271,7 +310,8 @@ pub fn run() {
             open_log_window,
             open_settings_window,
             set_active_page,
-            fetch_config
+            fetch_config,
+            download_and_install_update
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -432,19 +432,34 @@ function App() {
             {updateProgress !== null ? (
               <div className="update-progress">
                 <div className="update-progress-bar" style={{ width: `${updateProgress}%` }} />
-                <span>{updateProgress}%</span>
+                <span>{updateProgress === 100 ? "Installiert..." : `${updateProgress}%`}</span>
               </div>
             ) : (
               <>
-                <button
-                  className="update-btn install"
-                  onClick={() => {
-                    setUpdateProgress(0);
-                    void installUpdate((p) => setUpdateProgress(p));
-                  }}
-                >
-                  Jetzt installieren
-                </button>
+                {updateInfo.downloadUrl ? (
+                  <button
+                    className="update-btn install"
+                    onClick={() => {
+                      setUpdateProgress(0);
+                      void installUpdate(
+                        updateInfo.downloadUrl!,
+                        updateInfo.filename!,
+                        (p) => setUpdateProgress(p)
+                      );
+                    }}
+                  >
+                    Jetzt installieren
+                  </button>
+                ) : (
+                  <a
+                    className="update-btn install"
+                    href="https://github.com/Malionaro/apc-mini-rs-controll/releases/latest"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Download öffnen
+                  </a>
+                )}
                 <button className="update-btn dismiss" onClick={() => setUpdateInfo(null)}>
                   Später
                 </button>
