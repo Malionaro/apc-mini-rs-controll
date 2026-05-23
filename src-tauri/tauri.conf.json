@@ -1,0 +1,63 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "apc-mini-rs",
+  "version": "0.1.0",
+  "identifier": "com.malo.apc-mini-rs",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "APC Mini mk2 Control",
+        "width": 1500,
+        "height": 1000
+      },
+      {
+        "label": "logs",
+        "title": "APC System Logs",
+        "width": 500,
+        "height": 550,
+        "visible": false
+      },
+      {
+        "label": "settings",
+        "title": "APC Settings",
+        "width": 520,
+        "height": 725,
+        "visible": false
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "publisher": "Malionaro",
+    "windows": {
+      "wix": {
+        "language": ["de-DE", "en-US"]
+      },
+      "nsis": {
+        "displayLanguageSelector": true,
+        "languages": ["German", "English"],
+        "installMode": "both",
+        "headerImage": "resources/banner.bmp",
+        "sidebarImage": "resources/dialog.bmp"
+      }
+    }
+  }
+}

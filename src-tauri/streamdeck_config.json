@@ -1,0 +1,78 @@
+{
+  "device_name": "APC mini mk2",
+  "output_device_name": "",
+  "pages": [
+    {
+      "name": "Main",
+      "mappings": {
+        "56": {
+          "actions": [
+            {
+              "type": "audio",
+              "path": null,
+              "url": null,
+              "keys": null,
+              "delay_ms": null,
+              "midi_type": null,
+              "midi_note": null,
+              "midi_value": null,
+              "midi_channel": null,
+              "midi_device": null,
+              "media_key": null,
+              "obs_action": null,
+              "obs_target": null,
+              "audio_path": "",
+              "audio_volume": null,
+              "text_content": null,
+              "system_command": null,
+              "target_page": null
+            }
+          ],
+          "is_toggle": false,
+          "color": 0,
+          "on_color": null,
+          "state": false,
+          "label": null
+        },
+        "63": {
+          "actions": [
+            {
+              "type": "obs",
+              "path": null,
+              "url": null,
+              "keys": null,
+              "delay_ms": null,
+              "midi_type": null,
+              "midi_note": null,
+              "midi_value": null,
+              "midi_channel": null,
+              "midi_device": null,
+              "media_key": null,
+              "obs_action": "ToggleMute",
+              "obs_target": "",
+              "audio_path": null,
+              "audio_volume": null,
+              "text_content": null,
+              "system_command": null,
+              "target_page": null
+            }
+          ],
+          "is_toggle": false,
+          "color": 0,
+          "on_color": null,
+          "state": false,
+          "label": null
+        }
+      }
+    }
+  ],
+  "active_page": "Main",
+  "fader_mappings": {},
+  "obs": {
+    "host": "localhost",
+    "port": 4455,
+    "password": null,
+    "auto_connect": false
+  },
+  "config_url": ""
+}
