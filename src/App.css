@@ -1068,6 +1068,11 @@ input::placeholder {
   min-width: 0;
 }
 
+.cascading-selects input {
+  width: 100px;
+  flex: 0 0 100px;
+}
+
 .obs-tabs {
   display: flex;
   gap: 4px;

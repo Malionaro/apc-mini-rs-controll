@@ -5,6 +5,37 @@
     {
       "name": "Main",
       "mappings": {
+        "63": {
+          "actions": [
+            {
+              "type": "hotkey",
+              "path": null,
+              "url": null,
+              "keys": [
+                "0"
+              ],
+              "delay_ms": null,
+              "midi_type": null,
+              "midi_note": null,
+              "midi_value": null,
+              "midi_channel": null,
+              "midi_device": null,
+              "media_key": null,
+              "obs_action": null,
+              "obs_target": null,
+              "audio_path": null,
+              "audio_volume": null,
+              "text_content": null,
+              "system_command": null,
+              "target_page": null
+            }
+          ],
+          "is_toggle": false,
+          "color": 0,
+          "on_color": null,
+          "state": false,
+          "label": null
+        },
         "56": {
           "actions": [
             {
@@ -22,35 +53,6 @@
               "obs_action": null,
               "obs_target": null,
               "audio_path": "",
-              "audio_volume": null,
-              "text_content": null,
-              "system_command": null,
-              "target_page": null
-            }
-          ],
-          "is_toggle": false,
-          "color": 0,
-          "on_color": null,
-          "state": false,
-          "label": null
-        },
-        "63": {
-          "actions": [
-            {
-              "type": "obs",
-              "path": null,
-              "url": null,
-              "keys": null,
-              "delay_ms": null,
-              "midi_type": null,
-              "midi_note": null,
-              "midi_value": null,
-              "midi_channel": null,
-              "midi_device": null,
-              "media_key": null,
-              "obs_action": "ToggleMute",
-              "obs_target": "",
-              "audio_path": null,
               "audio_volume": null,
               "text_content": null,
               "system_command": null,

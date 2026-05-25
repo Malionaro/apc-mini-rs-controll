@@ -8,7 +8,7 @@ use midi::{MidiState, start_listener, stop_listener};
 use obs::ObsState;
 use std::sync::{Arc, Mutex};
 use tauri::{
-    State, Manager, WebviewUrl, WebviewWindowBuilder, AppHandle,
+    State, Manager, WebviewUrl, WebviewWindowBuilder, AppHandle, Emitter,
     window::Color,
     menu::{Menu, MenuItem}, tray::{TrayIconBuilder, TrayIconEvent, MouseButton},
 };
@@ -73,7 +73,18 @@ fn get_midi_output_ports() -> Vec<String> {
 
 #[tauri::command]
 fn connect_obs(host: String, port: u16, password: Option<String>, state: State<'_, Arc<MidiState>>) -> Result<(), String> {
-    state.obs.connect(&host, port, password)
+    let res = state.obs.connect(&host, port, password);
+    if res.is_ok() {
+        if let Some(handle) = &*state.app_handle.lock().unwrap() {
+            let _ = handle.emit("obs-connection-status", true);
+        }
+    }
+    res
+}
+
+#[tauri::command]
+fn get_obs_status(state: State<'_, Arc<MidiState>>) -> bool {
+    state.obs.is_connected()
 }
 
 #[tauri::command]
@@ -244,6 +255,18 @@ pub fn run() {
             let app_handle = app.handle().clone();
             *handle = Some(app_handle.clone());
             
+            // Auto-connect to OBS on startup if configured
+            let config = state_setup.config.lock().unwrap().clone();
+            if config.obs.auto_connect && !config.obs.host.is_empty() {
+                let obs = state_setup.obs.clone();
+                let app_handle_clone = app_handle.clone();
+                std::thread::spawn(move || {
+                    if obs.connect(&config.obs.host, config.obs.port, config.obs.password.clone()).is_ok() {
+                        let _ = app_handle_clone.emit("obs-connection-status", true);
+                    }
+                });
+            }
+            
             let quit_i = MenuItem::with_id(app, "quit", "Exit Console", true, None::<&str>)?;
             let show_i = MenuItem::with_id(app, "show", "Show Interface", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&show_i, &quit_i])?;
@@ -301,6 +324,7 @@ pub fn run() {
             get_midi_ports,
             get_midi_output_ports,
             connect_obs,
+            get_obs_status,
             get_obs_scenes,
             get_obs_inputs,
             get_obs_sources,

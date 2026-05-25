@@ -17,6 +17,7 @@ function App() {
   const [selectedFader, setSelectedFader] = useState<number | null>(null);
   const [isListening, setIsListening] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
+  const [isObsConnected, setIsObsConnected] = useState(false);
   const [logs, setLogs] = useState<string[]>([]);
   const [midiPorts, setMidiPorts] = useState<string[]>([]);
   const [autoSelect, setAutoSelect] = useState(true);
@@ -43,6 +44,7 @@ function App() {
     let unlistenLog: (() => void) | undefined;
     let unlistenMidi: (() => void) | undefined;
     let unlistenStatus: (() => void) | undefined;
+    let unlistenObsStatus: (() => void) | undefined;
 
     const setup = async () => {
       await loadConfig();
@@ -86,6 +88,10 @@ function App() {
       unlistenStatus = await listen<boolean>("connection-status", (event) => {
         setIsConnected(event.payload);
       });
+
+      unlistenObsStatus = await listen<boolean>("obs-connection-status", (event) => {
+        setIsObsConnected(event.payload);
+      });
     };
 
     void setup();
@@ -94,8 +100,24 @@ function App() {
       unlistenLog?.();
       unlistenMidi?.();
       unlistenStatus?.();
+      unlistenObsStatus?.();
     };
   }, [isSettingsWindow, isLogsWindow]);
+
+  useEffect(() => {
+    const checkObsStatus = async () => {
+      try {
+        const connected = await invoke<boolean>("get_obs_status");
+        setIsObsConnected(connected);
+      } catch (e) {
+        console.error("Error checking OBS status:", e);
+      }
+    };
+
+    void checkObsStatus();
+    const interval = setInterval(checkObsStatus, 3000);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     if (logEndRef.current) {
@@ -589,8 +611,8 @@ function App() {
           </label>
 
           <div className="status-center">
-            <span className={`status-badge ${isConnected ? "online" : "offline"}`} />
-            <span className="connection-text">{isConnected ? "OBS Online" : "OBS Offline"}</span>
+            <span className={`status-badge ${isObsConnected ? "online" : "offline"}`} />
+            <span className="connection-text">{isObsConnected ? "OBS Online" : "OBS Offline"}</span>
           </div>
 
           <button

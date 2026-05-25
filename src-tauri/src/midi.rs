@@ -46,12 +46,17 @@ pub fn start_listener(state: Arc<MidiState>) -> Result<(), String> {
     let config_snap = state.config.lock().unwrap().clone();
     if config_snap.obs.auto_connect && !config_snap.obs.host.is_empty() {
         let obs_state = state.obs.clone();
+        let state_clone = state.clone();
         thread::spawn(move || {
-            let _ = obs_state.connect(
+            if obs_state.connect(
                 &config_snap.obs.host,
                 config_snap.obs.port,
                 config_snap.obs.password.clone(),
-            );
+            ).is_ok() {
+                if let Some(handle) = &*state_clone.app_handle.lock().unwrap() {
+                    let _ = handle.emit("obs-connection-status", true);
+                }
+            }
         });
     }
 
