@@ -17,6 +17,16 @@ export interface Action {
   text_content?: string;
   system_command?: string;
   target_page?: string;
+
+  // Webhook fields
+  webhook_url?: string;
+  webhook_method?: string;
+  webhook_payload?: string;
+}
+
+export interface SmartProfileMapping {
+  process_name: string;
+  target_page: string;
 }
 
 export interface Mapping {
@@ -26,6 +36,8 @@ export interface Mapping {
   on_color?: number;
   state: boolean;
   label?: string;
+  current_step?: number;
+  is_sequence?: boolean;
 }
 
 export interface Page {
@@ -41,6 +53,23 @@ export interface AppConfig {
   fader_mappings: Record<string, { type: string; target?: string }>;
   obs: { host: string; port: number; password?: string; auto_connect: boolean };
   config_url: string;
+
+  // Advanced features
+  smart_profiles_enabled: boolean;
+  smart_profiles: SmartProfileMapping[];
+  web_companion_enabled: boolean;
+  web_companion_port: number;
+  obs_peak_meter_enabled: boolean;
+  obs_peak_meter_source?: string;
+  obs_peak_meter_column?: number;
+  ripple_effect_enabled: boolean;
+
+  // Spotify & Discord Integration
+  media_progress_enabled: boolean;
+  media_progress_row: number;
+  media_control_note: number;
+  discord_mute_note: number;
+  discord_deafen_note: number;
 }
 
 export const padRows = [7, 6, 5, 4, 3, 2, 1, 0];
@@ -59,7 +88,18 @@ export const ACTION_OPTIONS = [
   { value: "audio", label: "Sound abspielen", description: "Spielt eine lokale Audiodatei (MP3/WAV) ab. Ideal für eigene Soundboards." },
   { value: "text", label: "Text senden", description: "Schreibt automatisch einen Text, als hättest du ihn gerade getippt." },
   { value: "system", label: "Systembefehl", description: "Führt einen Befehl in der Windows-CMD aus. Nur für Fortgeschrittene!" },
-  { value: "page", label: "Seite wechseln", description: "Wechselt das aktive Layout deiner Pads auf eine andere konfigurierte Seite." },
+  { value: "page", label: "Ordner: Öffnen / Seite wechseln", description: "Öffnet einen Ordner (wechselt das aktive Layout) auf eine andere konfigurierte Seite." },
+  { value: "page_back", label: "Ordner: Zurück", description: "Navigiert zurück zur vorherigen Seite in deiner Ordner-Historie." },
+  { value: "webhook", label: "Webhook senden", description: "Sendet einen HTTP-Request (GET/POST) an eine beliebige URL." },
+  { value: "audio_panic", label: "Alle Sounds stoppen", description: "Stoppt sofort alle aktuell spielenden Soundboard-Dateien." },
+  { value: "discord_mute", label: "Discord: Stumm toggeln", description: "Schaltet dein Mikrofon in Discord stumm/aktiv und färbt die Taste Rot." },
+  { value: "discord_deafen", label: "Discord: Taub toggeln", description: "Schaltet den Ton in Discord taub/aktiv und färbt die Taste Gelb." },
+  { value: "media_play_pause", label: "Medien: Play/Pause", description: "Startet oder pausiert deine Musik. Taste leuchtet Grün/Rot." },
+  { value: "media_next", label: "Medien: Nächster Titel", description: "Springt zum nächsten Titel in deiner Wiedergabeliste." },
+  { value: "media_prev", label: "Medien: Vorheriger Titel", description: "Springt zum vorherigen Titel in deiner Wiedergabeliste." },
+  { value: "mouse_click", label: "Mausklick simulieren", description: "Simuliert einen Klick mit der linken, rechten, mittleren oder Doppelklick-Maustaste." },
+  { value: "mouse_move", label: "Mauszeiger bewegen", description: "Bewegt den Mauszeiger relativ zur aktuellen Position (X,Y) in Pixeln." },
+  { value: "mouse_scroll", label: "Mausrad scrollen", description: "Scrollt das Mausrad vertikal (z. B. positive Zahl für nach oben, negative Zahl für nach unten)." },
 ] as const;
 
 export const ACTION_FIELD_MAP: Record<string, { label: string; placeholder: string }> = {
@@ -76,9 +116,20 @@ export const ACTION_FIELD_MAP: Record<string, { label: string; placeholder: stri
   obs_visible: { label: "Szene & Quelle (Szene|Quelle|1/0)", placeholder: "Gaming|Overlay|1" },
   obs_replay: { label: "Modus (toggle/save)", placeholder: "toggle" },
   audio: { label: "Audio Datei", placeholder: "C:\\Sounds\\..." },
+  audio_panic: { label: "Info", placeholder: "Stoppt alle Sounds sofort auf Knopfdruck." },
   text: { label: "Text", placeholder: "Nachricht oder Macro-Text" },
   system: { label: "Systembefehl", placeholder: "cmd /c ..." },
-  page: { label: "Zielseite", placeholder: "Page name" },
+  page: { label: "Zielseite (Ordner)", placeholder: "Name der Seite" },
+  page_back: { label: "Info", placeholder: "Ordner verlassen. Kehrt zur vorherigen Seite zurück." },
+  webhook: { label: "Webhook URL (z. B. http://localhost:8080/api)", placeholder: "http://..." },
+  discord_mute: { label: "Info", placeholder: "Toggelt Discord-Mute. Keine zusätzlichen Felder nötig." },
+  discord_deafen: { label: "Info", placeholder: "Toggelt Discord-Deafen. Keine zusätzlichen Felder nötig." },
+  media_play_pause: { label: "Info", placeholder: "Toggelt Wiedergabe. Keine zusätzlichen Felder nötig." },
+  media_next: { label: "Info", placeholder: "Nächster Titel. Keine zusätzlichen Felder nötig." },
+  media_prev: { label: "Info", placeholder: "Vorheriger Titel. Keine zusätzlichen Felder nötig." },
+  mouse_click: { label: "Maustaste (Left / Right / Middle / DoubleLeft)", placeholder: "Left" },
+  mouse_move: { label: "Relative Bewegung (X, Y)", placeholder: "100,-50" },
+  mouse_scroll: { label: "Scroll-Intensität (z. B. 120 oder -120)", placeholder: "120" },
 };
 
 export function createEmptyMapping(): Mapping {

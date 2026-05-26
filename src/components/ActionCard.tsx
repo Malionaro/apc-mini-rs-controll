@@ -15,6 +15,7 @@ interface ActionCardProps {
   ) => void;
   updateActionFields: (index: number, fields: Partial<Action>) => void;
   updateSelectedMapping: (updater: (mapping: Mapping) => void) => void;
+  pages?: { name: string }[];
 }
 
 export function ActionCard({
@@ -26,6 +27,7 @@ export function ActionCard({
   updateSelectedActionField,
   updateActionFields,
   updateSelectedMapping,
+  pages = [],
 }: ActionCardProps) {
   const [localScenes, setLocalScenes] = useState<string[]>([]);
   const [localInputs, setLocalInputs] = useState<string[]>([]);
@@ -175,24 +177,40 @@ export function ActionCard({
               }
             }}
           >
-            {ACTION_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.value.includes("obs")
-                  ? "🎥 "
-                  : option.value === "app"
-                  ? "🚀 "
-                  : option.value === "url"
-                  ? "🌐 "
-                  : option.value === "hotkey"
-                  ? "⌨️ "
-                  : option.value === "audio"
-                  ? "🔊 "
-                  : option.value === "midi"
-                  ? "🎹 "
-                  : "🔹 "}
-                {option.label}
-              </option>
-            ))}
+            {ACTION_OPTIONS.map((option) => {
+              const getEmoji = (val: string) => {
+                switch (val) {
+                  case "app": return "🚀 ";
+                  case "url": return "🌐 ";
+                  case "hotkey": return "⌨️ ";
+                  case "wait": return "⏱️ ";
+                  case "midi": return "🎹 ";
+                  case "media": return "🎵 ";
+                  case "obs": return "🎥 ";
+                  case "audio": return "🔊 ";
+                  case "text": return "📝 ";
+                  case "system": return "💻 ";
+                  case "page": return "📂 ";
+                  case "page_back": return "↩️ ";
+                  case "webhook": return "🔗 ";
+                  case "audio_panic": return "🛑 ";
+                  case "discord_mute": return "🎙️ ";
+                  case "discord_deafen": return "🎧 ";
+                  case "media_play_pause": return "⏯️ ";
+                  case "media_next": return "⏭️ ";
+                  case "media_prev": return "⏮️ ";
+                  case "mouse_click": return "🖱️ ";
+                  case "mouse_move": return "🎯 ";
+                  case "mouse_scroll": return "📜 ";
+                  default: return "🔹 ";
+                }
+              };
+              return (
+                <option key={option.value} value={option.value}>
+                  {getEmoji(option.value)} {option.label}
+                </option>
+              );
+            })}
           </select>
           <div className="info-trigger">
             <i>i</i>
@@ -749,6 +767,110 @@ export function ActionCard({
                 placeholder="100"
               />
             </div>
+          </div>
+        ) : action.type === "mouse_click" ? (
+          <div>
+            <label className="field-label">Maustaste</label>
+            <select
+              value={action.system_command || "Left"}
+              className="dark-select"
+              onChange={(event) => updateActionValue(index, event.target.value)}
+            >
+              <option value="Left">Linksklick (Standard)</option>
+              <option value="Right">Rechtsklick</option>
+              <option value="Middle">Mittelklick (Mausrad)</option>
+              <option value="DoubleLeft">Doppelklick links</option>
+            </select>
+          </div>
+        ) : action.type === "mouse_move" ? (
+          <div>
+            <label className="field-label">Relative Bewegung (Pixel: X,Y)</label>
+            <input
+              value={action.system_command || ""}
+              onChange={(event) => updateActionValue(index, event.target.value)}
+              placeholder="z. B. 100,-50 (100px rechts, 50px hoch)"
+            />
+            <p className="field-hint">Bewege den Mauszeiger ausgehend von der aktuellen Position.</p>
+          </div>
+        ) : action.type === "mouse_scroll" ? (
+          <div>
+            <label className="field-label">Scroll-Intensität</label>
+            <input
+              type="number"
+              value={action.system_command || "120"}
+              onChange={(event) => updateActionValue(index, event.target.value)}
+              placeholder="z. B. 120 (Mausrad hoch) oder -120 (Mausrad runter)"
+            />
+            <p className="field-hint">Eine Stufe entspricht üblicherweise 120 Einheiten.</p>
+          </div>
+        ) : action.type === "webhook" ? (
+          <div className="webhook-settings">
+            <div style={{ marginBottom: "12px" }}>
+              <label className="field-label">Webhook URL</label>
+              <input
+                value={action.webhook_url || ""}
+                onChange={(event) => updateActionValue(index, event.target.value)}
+                placeholder="http://localhost:8080/api/endpoint"
+              />
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: "12px", marginBottom: "12px" }}>
+              <div>
+                <label className="field-label">Methode</label>
+                <select
+                  value={action.webhook_method || "POST"}
+                  className="dark-select"
+                  onChange={(event) => updateSelectedActionField(index, "webhook_method", event.target.value)}
+                >
+                  <option value="GET">GET</option>
+                  <option value="POST">POST</option>
+                </select>
+              </div>
+              {action.webhook_method === "POST" && (
+                <div>
+                  <label className="field-label">JSON Payload</label>
+                  <textarea
+                    style={{
+                      width: "100%",
+                      minHeight: "60px",
+                      background: "var(--card-bg, #1a2238)",
+                      border: "1px solid var(--border-color, #2d3b5e)",
+                      borderRadius: "6px",
+                      color: "#fff",
+                      fontFamily: "monospace",
+                      padding: "8px",
+                      resize: "vertical"
+                    }}
+                    value={action.webhook_payload || ""}
+                    onChange={(event) => updateSelectedActionField(index, "webhook_payload", event.target.value)}
+                    placeholder='{"status": "activated"}'
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+        ) : action.type === "page" ? (
+          <div>
+            <label className="field-label">Zielseite (Ordner)</label>
+            {pages.length > 0 ? (
+              <select
+                value={action.target_page || ""}
+                className="dark-select"
+                onChange={(event) => updateActionValue(index, event.target.value)}
+              >
+                <option value="">Ordner / Seite wählen...</option>
+                {pages.map((p) => (
+                  <option key={p.name} value={p.name}>
+                    📁 {p.name}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <input
+                value={action.target_page || ""}
+                onChange={(event) => updateActionValue(index, event.target.value)}
+                placeholder="Name der Seite"
+              />
+            )}
           </div>
         ) : (
           <div>

@@ -38,6 +38,17 @@ pub struct Action {
     
     // Navigation
     pub target_page: Option<String>,
+
+    // Webhook Felder
+    pub webhook_url: Option<String>,
+    pub webhook_method: Option<String>, // "GET" oder "POST"
+    pub webhook_payload: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct SmartProfileMapping {
+    pub process_name: String, // z. B. "chrome.exe", "obs64.exe"
+    pub target_page: String,  // z. B. "Browser", "OBS-Steuerung"
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -52,6 +63,11 @@ pub struct Mapping {
     #[serde(default)]
     pub state: bool,
     pub label: Option<String>,
+    // Für Multi-Schritt-Makros (Toggle / Sequenz)
+    #[serde(default)]
+    pub current_step: usize,
+    #[serde(default)]
+    pub is_sequence: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -97,10 +113,43 @@ pub struct AppConfig {
     pub obs: ObsConfig,
     #[serde(default)]
     pub config_url: String,
+
+    // Neue Advanced Features
+    #[serde(default)]
+    pub smart_profiles_enabled: bool,
+    #[serde(default)]
+    pub smart_profiles: Vec<SmartProfileMapping>,
+    #[serde(default = "default_web_companion_enabled")]
+    pub web_companion_enabled: bool,
+    #[serde(default = "default_web_companion_port")]
+    pub web_companion_port: u16,
+    #[serde(default)]
+    pub obs_peak_meter_enabled: bool,
+    pub obs_peak_meter_source: Option<String>,
+    pub obs_peak_meter_column: Option<u8>,
+    #[serde(default)]
+    pub ripple_effect_enabled: bool,
+
+    // Spotify & Discord Integration
+    #[serde(default)]
+    pub media_progress_enabled: bool,
+    #[serde(default)]
+    pub media_progress_row: u8, // 0-7 (Standard: 0)
+    #[serde(default = "default_media_control_note")]
+    pub media_control_note: u8, // Standard: 112 (side key 1)
+    #[serde(default = "default_discord_mute_note")]
+    pub discord_mute_note: u8, // Standard: 113 (side key 2)
+    #[serde(default = "default_discord_deafen_note")]
+    pub discord_deafen_note: u8, // Standard: 114 (side key 3)
 }
 
 fn default_device_name() -> String { "APC mini mk2".to_string() }
 fn default_page_name() -> String { "Main".to_string() }
+fn default_web_companion_enabled() -> bool { false }
+fn default_web_companion_port() -> u16 { 1421 }
+fn default_media_control_note() -> u8 { 112 }
+fn default_discord_mute_note() -> u8 { 113 }
+fn default_discord_deafen_note() -> u8 { 114 }
 
 impl Default for AppConfig {
     fn default() -> Self {
@@ -112,6 +161,19 @@ impl Default for AppConfig {
             fader_mappings: HashMap::new(),
             obs: ObsConfig::default(),
             config_url: String::new(),
+            smart_profiles_enabled: false,
+            smart_profiles: vec![],
+            web_companion_enabled: false,
+            web_companion_port: default_web_companion_port(),
+            obs_peak_meter_enabled: false,
+            obs_peak_meter_source: None,
+            obs_peak_meter_column: None,
+            ripple_effect_enabled: false,
+            media_progress_enabled: false,
+            media_progress_row: 0,
+            media_control_note: default_media_control_note(),
+            discord_mute_note: default_discord_mute_note(),
+            discord_deafen_note: default_discord_deafen_note(),
         }
     }
 }
@@ -157,6 +219,19 @@ pub fn load_config() -> AppConfig {
                             fader_mappings: legacy.fader_mappings,
                             obs: legacy.obs,
                             config_url: String::new(),
+                            smart_profiles_enabled: false,
+                            smart_profiles: vec![],
+                            web_companion_enabled: false,
+                            web_companion_port: default_web_companion_port(),
+                            obs_peak_meter_enabled: false,
+                            obs_peak_meter_source: None,
+                            obs_peak_meter_column: None,
+                            ripple_effect_enabled: false,
+                            media_progress_enabled: false,
+                            media_progress_row: 0,
+                            media_control_note: default_media_control_note(),
+                            discord_mute_note: default_discord_mute_note(),
+                            discord_deafen_note: default_discord_deafen_note(),
                         };
                     }
                 }

@@ -145,6 +145,7 @@ export function Inspector({
                 updateSelectedActionField={updateSelectedActionField}
                 updateActionFields={updateActionFields}
                 updateSelectedMapping={updateSelectedMapping}
+                pages={config.pages}
               />
             ))
           ) : (
@@ -159,6 +160,7 @@ export function Inspector({
   }
 
   if (selectedFader !== null) {
+    const faderMapping = config.fader_mappings[selectedFader.toString()] || { type: "None" };
     return (
       <div className="animate-in config-view">
         <div className="config-header">
@@ -173,19 +175,42 @@ export function Inspector({
             <label>Systemzuweisung</label>
             <select
               className="dark-select"
-              value={config.fader_mappings[selectedFader.toString()]?.type || "None"}
+              value={faderMapping.type || "None"}
               onChange={(event) => {
                 const nextConfig = structuredClone(config);
                 nextConfig.fader_mappings[selectedFader.toString()] = {
                   type: event.target.value,
+                  target: faderMapping.target || "",
                 };
                 void saveConfig(nextConfig);
               }}
             >
               <option value="None">Nicht zugewiesen</option>
-              <option value="volume">Master Volume</option>
+              <option value="volume">System Master-Lautstärke</option>
+              <option value="app_volume">Programm-Lautstärke (z. B. spotify.exe)</option>
+              <option value="obs_volume">OBS Audioquelle-Lautstärke</option>
             </select>
           </div>
+
+          {(faderMapping.type === "app_volume" || faderMapping.type === "obs_volume") && (
+            <div className="form-group full">
+              <label>
+                {faderMapping.type === "app_volume" ? "Programmname (z. B. spotify.exe)" : "OBS Quelle (z. B. Desktop-Audio)"}
+              </label>
+              <input
+                value={faderMapping.target || ""}
+                onChange={(event) => {
+                  const nextConfig = structuredClone(config);
+                  nextConfig.fader_mappings[selectedFader.toString()] = {
+                    type: faderMapping.type,
+                    target: event.target.value,
+                  };
+                  void saveConfig(nextConfig);
+                }}
+                placeholder={faderMapping.type === "app_volume" ? "spotify.exe" : "Mic/Aux"}
+              />
+            </div>
+          )}
         </section>
       </div>
     );

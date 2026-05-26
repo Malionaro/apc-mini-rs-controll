@@ -19,6 +19,10 @@ pub struct MidiState {
     pub obs: Arc<ObsState>,
     pub is_recording: Arc<Mutex<bool>>,
     pub is_streaming: Arc<Mutex<bool>>,
+    pub is_discord_muted: Arc<Mutex<bool>>,
+    pub is_discord_deafened: Arc<Mutex<bool>>,
+    pub is_media_playing: Arc<Mutex<bool>>,
+    pub page_history: Arc<Mutex<Vec<String>>>,
 }
 
 pub fn add_log(state: &Arc<MidiState>, msg: String) {
@@ -42,6 +46,12 @@ pub fn start_listener(state: Arc<MidiState>) -> Result<(), String> {
     drop(is_listening);
 
     add_log(&state, "MIDI Engine START".to_string());
+    
+    // Smart Profiles Window Watcher starten
+    crate::window_watcher::start_window_watcher(state.clone());
+    
+    // Web Companion Server starten
+    crate::web_server::start_web_server(state.clone());
     
     let config_snap = state.config.lock().unwrap().clone();
     if config_snap.obs.auto_connect && !config_snap.obs.host.is_empty() {
@@ -192,6 +202,7 @@ fn run_midi_loop(state: Arc<MidiState>) -> Result<(), String> {
     }
 
     let mut last_page = "".to_string();
+    let mut tick_counter = 0;
     while *state.is_listening.lock().unwrap() {
         let current_page = state.config.lock().unwrap().active_page.clone();
         if current_page != last_page {
@@ -200,6 +211,16 @@ fn run_midi_loop(state: Arc<MidiState>) -> Result<(), String> {
             }
             last_page = current_page;
         }
+        
+        tick_counter += 1;
+        if tick_counter >= 10 { // Every 1 second (10 * 100ms)
+            tick_counter = 0;
+            if let Ok(mut out) = conn_out_mtx.lock() {
+                update_media_session_leds(&mut out, &state);
+                update_discord_leds(&mut out, &state);
+            }
+        }
+        
         thread::sleep(Duration::from_millis(100));
     }
 
@@ -275,6 +296,43 @@ fn handle_obs_event(event: Event, state: &Arc<MidiState>, conn_out: &Arc<Mutex<M
                     send_obs_webhook(&state_clone, "SourceVisibilityChanged", &target, json!(enabled));
                 }
             });
+        }
+        Event::InputVolumeMeters { inputs } => {
+            let (meter_enabled, source_name, column) = {
+                let config = state.config.lock().unwrap();
+                (
+                    config.obs_peak_meter_enabled,
+                    config.obs_peak_meter_source.clone().unwrap_or_default(),
+                    config.obs_peak_meter_column.unwrap_or(7),
+                )
+            };
+            
+            if meter_enabled && !source_name.is_empty() {
+                if let Some(meter) = inputs.iter().find(|m| m.name == source_name) {
+                    if let Some(channel_levels) = meter.levels.get(0) {
+                        let val = channel_levels[0]; // multiplier level from 0.0 upwards
+                        let level = ((val * 8.0).round() as u8).min(8);
+                        
+                        if let Ok(mut out) = conn_out.lock() {
+                            for row in 0..8u8 {
+                                let note = (row * 8 + column) as u8;
+                                let color = if row < level {
+                                    if row < 5 {
+                                        21 // Green
+                                    } else if row < 7 {
+                                        13 // Yellow/Amber
+                                    } else {
+                                        121 // Red
+                                    }
+                                } else {
+                                    0 // Off
+                                };
+                                let _ = out.send(&[0x90, note, color]);
+                            }
+                        }
+                    }
+                }
+            }
         }
         _ => {}
     }
@@ -363,47 +421,311 @@ fn refresh_leds(conn_out: &mut MidiOutputConnection, state: &Arc<MidiState>) {
     for n in 0..127 {
         let _ = conn_out.send(&[0x90, n, 0]);
     }
-    for (note_str, m) in &page.mappings {
+    for (note_str, _m) in &page.mappings {
         if let Ok(note) = note_str.parse::<u8>() {
-            let color = if m.is_toggle && m.state {
-                m.on_color.unwrap_or(m.color)
-            } else {
-                m.color
-            };
+            let color = get_mapping_color(note, state);
             let _ = conn_out.send(&[0x90, note, color]);
         }
     }
+    // Update active media LEDs and progress bar if enabled
+    update_media_session_leds(conn_out, state);
+    update_discord_leds(conn_out, state);
 }
 
 fn handle_interaction(note: u8, state: &Arc<MidiState>, conn_out: &Arc<Mutex<MidiOutputConnection>>) {
-    let mapping_opt = {
+    let (mapping_opt, actions_to_run, ripple_enabled) = {
         let mut config = state.config.lock().unwrap();
+        let ripple = config.ripple_effect_enabled;
         let active_page_name = config.active_page.clone();
         let page = config.pages.iter_mut().find(|p| p.name == active_page_name);
         if let Some(p) = page {
-            p.mappings.get_mut(&note.to_string()).map(|m| {
+            if let Some(m) = p.mappings.get_mut(&note.to_string()) {
                 if m.is_toggle {
                     m.state = !m.state;
                 }
-                m.clone()
-            })
+                
+                let run_actions = if m.is_sequence && !m.actions.is_empty() {
+                    let step = m.current_step % m.actions.len();
+                    m.current_step = (m.current_step + 1) % m.actions.len();
+                    vec![m.actions[step].clone()]
+                } else if m.is_toggle && m.actions.len() >= 2 {
+                    if m.state {
+                        vec![m.actions[0].clone()]
+                    } else {
+                        vec![m.actions[1].clone()]
+                    }
+                } else {
+                    m.actions.clone()
+                };
+                
+                (Some(m.clone()), run_actions, ripple)
+            } else {
+                (None, vec![], false)
+            }
         } else {
-            None
+            (None, vec![], false)
         }
     };
 
     if let Some(mapping) = mapping_opt {
         add_log(state, format!("Taste {}: {}", note, mapping.label.clone().unwrap_or_default()));
-        for action in &mapping.actions {
+        
+        // Execute actions
+        for action in &actions_to_run {
             execute_action(action, state);
         }
+        
+        // Update local LED color
         if let Ok(mut out) = conn_out.lock() {
-            let color = if mapping.is_toggle && mapping.state {
-                mapping.on_color.unwrap_or(mapping.color)
-            } else {
-                mapping.color
-            };
+            let color = get_mapping_color(note, state);
             let _ = out.send(&[0x90, note, color]);
+            
+            // Instantly sync any other Discord/Media buttons on the page
+            update_media_session_leds(&mut out, state);
+            update_discord_leds(&mut out, state);
+        }
+
+        // Trigger Ripple LED effect if enabled
+        if ripple_enabled {
+            trigger_ripple_effect(note, conn_out.clone(), state.clone());
+        }
+    }
+}
+
+fn trigger_ripple_effect(note: u8, conn_out: Arc<Mutex<MidiOutputConnection>>, state: Arc<MidiState>) {
+    if note >= 64 {
+        return; // Ripple is only for the 8x8 grid
+    }
+    
+    let state_clone = state.clone();
+    let conn_out_clone = conn_out.clone();
+    thread::spawn(move || {
+        let r = (note / 8) as i8;
+        let c = (note % 8) as i8;
+        
+        let mut radius_1 = Vec::new();
+        let mut radius_2 = Vec::new();
+        
+        for row in 0..8i8 {
+            for col in 0..8i8 {
+                let dist = std::cmp::max((row - r).abs(), (col - c).abs());
+                let n = (row * 8 + col) as u8;
+                if dist == 1 {
+                    radius_1.push(n);
+                } else if dist == 2 {
+                    radius_2.push(n);
+                }
+            }
+        }
+        
+        // Step 1: Glow Radius 1 (e.g. Cyan color)
+        if let Ok(mut out) = conn_out_clone.lock() {
+            for &n in &radius_1 {
+                let _ = out.send(&[0x90, n, 45]);
+            }
+        }
+        thread::sleep(Duration::from_millis(80));
+        
+        // Step 2: Dim Radius 1, Glow Radius 2
+        if let Ok(mut out) = conn_out_clone.lock() {
+            for &n in &radius_1 {
+                let orig = get_mapping_color(n, &state_clone);
+                let _ = out.send(&[0x90, n, orig]);
+            }
+            for &n in &radius_2 {
+                let _ = out.send(&[0x90, n, 49]); // Magenta/Purple color
+            }
+        }
+        thread::sleep(Duration::from_millis(80));
+        
+        // Step 3: Restore Radius 2
+        if let Ok(mut out) = conn_out_clone.lock() {
+            for &n in &radius_2 {
+                let orig = get_mapping_color(n, &state_clone);
+                let _ = out.send(&[0x90, n, orig]);
+            }
+        }
+    });
+}
+
+fn get_mapping_color(note: u8, state: &Arc<MidiState>) -> u8 {
+    let config = state.config.lock().unwrap();
+    let active_page_name = config.active_page.clone();
+    if let Some(page) = config.pages.iter().find(|p| p.name == active_page_name) {
+        if let Some(mapping) = page.mappings.get(&note.to_string()) {
+            for action in &mapping.actions {
+                match action.action_type.as_str() {
+                    "discord" | "discord_mute" => {
+                        let is_muted = *state.is_discord_muted.lock().unwrap();
+                        return if is_muted { 121 } else { mapping.color };
+                    }
+                    "discord_deafen" => {
+                        let is_deafened = *state.is_discord_deafened.lock().unwrap();
+                        return if is_deafened { 13 } else { mapping.color };
+                    }
+                    "media_play_pause" => {
+                        let is_playing = *state.is_media_playing.lock().unwrap();
+                        return if is_playing { 21 } else { 121 };
+                    }
+                    _ => {}
+                }
+            }
+            if mapping.is_toggle && mapping.state {
+                return mapping.on_color.unwrap_or(mapping.color);
+            } else {
+                return mapping.color;
+            }
+        }
+    }
+    0
+}
+
+pub fn toggle_system_media_play_pause() -> Result<(), String> {
+    use windows::Media::Control::GlobalSystemMediaTransportControlsSessionManager;
+    let op = GlobalSystemMediaTransportControlsSessionManager::RequestAsync().map_err(|e| e.to_string())?;
+    let manager = op.get().map_err(|e| e.to_string())?;
+    if let Ok(session) = manager.GetCurrentSession() {
+        let op = session.TryTogglePlayPauseAsync().map_err(|e| e.to_string())?;
+        let _ = op.get();
+    }
+    Ok(())
+}
+
+fn update_media_session_leds(out: &mut MidiOutputConnection, state: &Arc<MidiState>) {
+    use windows::Media::Control::{
+        GlobalSystemMediaTransportControlsSessionManager,
+        GlobalSystemMediaTransportControlsSessionPlaybackStatus,
+    };
+
+    let (enabled, progress_row) = {
+        let config = state.config.lock().unwrap();
+        (config.media_progress_enabled, config.media_progress_row)
+    };
+
+    let manager = match GlobalSystemMediaTransportControlsSessionManager::RequestAsync() {
+        Ok(op) => match op.get() {
+            Ok(mgr) => mgr,
+            Err(_) => return,
+        },
+        Err(_) => return,
+    };
+
+    let session = match manager.GetCurrentSession() {
+        Ok(s) => s,
+        Err(_) => {
+            if enabled {
+                for col in 0..8 {
+                    let note = progress_row * 8 + col;
+                    let _ = out.send(&[0x90, note, 0]);
+                }
+            }
+            let active_page_name = {
+                let config = state.config.lock().unwrap();
+                config.active_page.clone()
+            };
+            let config = state.config.lock().unwrap();
+            if let Some(page) = config.pages.iter().find(|p| p.name == active_page_name) {
+                for (note_str, mapping) in &page.mappings {
+                    if let Ok(note) = note_str.parse::<u8>() {
+                        for action in &mapping.actions {
+                            if action.action_type == "media_play_pause" {
+                                let _ = out.send(&[0x90, note, 121]); // Red when no session
+                            }
+                        }
+                    }
+                }
+            }
+            return;
+        }
+    };
+
+    let is_playing = if let Ok(info) = session.GetPlaybackInfo() {
+        if let Ok(status) = info.PlaybackStatus() {
+            status == GlobalSystemMediaTransportControlsSessionPlaybackStatus::Playing
+        } else {
+            false
+        }
+    } else {
+        false
+    };
+
+    *state.is_media_playing.lock().unwrap() = is_playing;
+
+    let active_page_name = {
+        let config = state.config.lock().unwrap();
+        config.active_page.clone()
+    };
+    let config = state.config.lock().unwrap();
+    if let Some(page) = config.pages.iter().find(|p| p.name == active_page_name) {
+        for (note_str, mapping) in &page.mappings {
+            if let Ok(note) = note_str.parse::<u8>() {
+                for action in &mapping.actions {
+                    if action.action_type == "media_play_pause" {
+                        let play_pause_color = if is_playing { 21 } else { 121 }; // Green vs Red
+                        let _ = out.send(&[0x90, note, play_pause_color]);
+                    }
+                }
+            }
+        }
+    }
+
+    if !enabled {
+        return;
+    }
+
+    if let Ok(timeline) = session.GetTimelineProperties() {
+        if let (Ok(pos), Ok(end)) = (timeline.Position(), timeline.EndTime()) {
+            let pos_ticks = pos.Duration;
+            let end_ticks = end.Duration;
+            if end_ticks > 0 {
+                let percent = (pos_ticks as f64 / end_ticks as f64).min(1.0).max(0.0);
+                let filled_pads = (percent * 8.0).round() as u8;
+                for col in 0..8 {
+                    let note = progress_row * 8 + col;
+                    let color = if col < filled_pads {
+                        45 // Cyan
+                    } else {
+                        0 // Off
+                    };
+                    let _ = out.send(&[0x90, note, color]);
+                }
+                return;
+            }
+        }
+    }
+
+    for col in 0..8 {
+        let note = progress_row * 8 + col;
+        let _ = out.send(&[0x90, note, 0]);
+    }
+}
+
+fn update_discord_leds(out: &mut MidiOutputConnection, state: &Arc<MidiState>) {
+    let active_page_name = {
+        let config = state.config.lock().unwrap();
+        config.active_page.clone()
+    };
+    let config = state.config.lock().unwrap();
+    let page = match config.pages.iter().find(|p| p.name == active_page_name) {
+        Some(p) => p,
+        None => return,
+    };
+
+    let is_muted = *state.is_discord_muted.lock().unwrap();
+    let is_deafened = *state.is_discord_deafened.lock().unwrap();
+
+    for (note_str, mapping) in &page.mappings {
+        if let Ok(note) = note_str.parse::<u8>() {
+            for action in &mapping.actions {
+                if action.action_type == "discord" || action.action_type == "discord_mute" {
+                    let color = if is_muted { 121 } else { mapping.color };
+                    let _ = out.send(&[0x90, note, color]);
+                }
+                if action.action_type == "discord_deafen" {
+                    let color = if is_deafened { 13 } else { mapping.color };
+                    let _ = out.send(&[0x90, note, color]);
+                }
+            }
         }
     }
 }

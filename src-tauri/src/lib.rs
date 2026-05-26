@@ -2,6 +2,8 @@ pub mod config;
 pub mod midi;
 pub mod obs;
 pub mod actions;
+pub mod window_watcher;
+pub mod web_server;
 
 use config::{AppConfig, load_config, save_config};
 use midi::{MidiState, start_listener, stop_listener};
@@ -232,6 +234,11 @@ async fn fetch_config(url: String, state: State<'_, Arc<MidiState>>) -> Result<A
     Ok(next_config)
 }
 
+#[tauri::command]
+fn panic_stop_all_sounds() {
+    crate::actions::audio::panic_stop_all_sounds();
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let initial_config = load_config();
@@ -245,6 +252,10 @@ pub fn run() {
         obs: Arc::new(ObsState::new()),
         is_recording: Arc::new(Mutex::new(false)),
         is_streaming: Arc::new(Mutex::new(false)),
+        is_discord_muted: Arc::new(Mutex::new(false)),
+        is_discord_deafened: Arc::new(Mutex::new(false)),
+        is_media_playing: Arc::new(Mutex::new(false)),
+        page_history: Arc::new(Mutex::new(vec![])),
     });
 
     let state_setup = midi_state.clone();
@@ -335,7 +346,8 @@ pub fn run() {
             open_settings_window,
             set_active_page,
             fetch_config,
-            download_and_install_update
+            download_and_install_update,
+            panic_stop_all_sounds
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

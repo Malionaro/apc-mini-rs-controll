@@ -295,6 +295,7 @@ function App() {
         currentAction.text_content ||
         currentAction.system_command ||
         currentAction.target_page ||
+        currentAction.webhook_url ||
         currentAction.keys?.join(", ") ||
         currentAction.midi_type ||
         currentAction.delay_ms?.toString() ||
@@ -317,8 +318,11 @@ function App() {
         audio_path: type === "audio" ? value : undefined,
         audio_volume: type === "audio" ? currentAction.audio_volume || 100 : undefined,
         text_content: type === "text" ? value : undefined,
-        system_command: type === "system" ? value : undefined,
+        system_command: (type === "system" || type === "mouse_click" || type === "mouse_move" || type === "mouse_scroll") ? value : undefined,
         target_page: type === "page" ? value : undefined,
+        webhook_url: type === "webhook" ? value : undefined,
+        webhook_method: type === "webhook" ? currentAction.webhook_method || "POST" : undefined,
+        webhook_payload: type === "webhook" ? currentAction.webhook_payload || "" : undefined,
       };
     });
   };
@@ -337,6 +341,7 @@ function App() {
       currentAction.text_content = undefined;
       currentAction.system_command = undefined;
       currentAction.target_page = undefined;
+      currentAction.webhook_url = undefined;
 
       switch (currentAction.type) {
         case "url":
@@ -372,10 +377,16 @@ function App() {
           currentAction.text_content = value;
           break;
         case "system":
+        case "mouse_click":
+        case "mouse_move":
+        case "mouse_scroll":
           currentAction.system_command = value;
           break;
         case "page":
           currentAction.target_page = value;
+          break;
+        case "webhook":
+          currentAction.webhook_url = value;
           break;
         case "app":
         default:

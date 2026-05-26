@@ -8,12 +8,10 @@
         "63": {
           "actions": [
             {
-              "type": "hotkey",
-              "path": null,
+              "type": "app",
+              "path": "",
               "url": null,
-              "keys": [
-                "0"
-              ],
+              "keys": null,
               "delay_ms": null,
               "midi_type": null,
               "midi_note": null,
@@ -27,14 +25,19 @@
               "audio_volume": null,
               "text_content": null,
               "system_command": null,
-              "target_page": null
+              "target_page": null,
+              "webhook_url": null,
+              "webhook_method": null,
+              "webhook_payload": null
             }
           ],
           "is_toggle": false,
           "color": 0,
           "on_color": null,
           "state": false,
-          "label": null
+          "label": null,
+          "current_step": 0,
+          "is_sequence": false
         },
         "56": {
           "actions": [
@@ -56,19 +59,107 @@
               "audio_volume": null,
               "text_content": null,
               "system_command": null,
-              "target_page": null
+              "target_page": null,
+              "webhook_url": null,
+              "webhook_method": null,
+              "webhook_payload": null
             }
           ],
           "is_toggle": false,
           "color": 0,
           "on_color": null,
           "state": false,
-          "label": null
+          "label": null,
+          "current_step": 0,
+          "is_sequence": false
+        },
+        "55": {
+          "actions": [
+            {
+              "type": "page",
+              "path": null,
+              "url": null,
+              "keys": null,
+              "delay_ms": null,
+              "midi_type": null,
+              "midi_note": null,
+              "midi_value": null,
+              "midi_channel": null,
+              "midi_device": null,
+              "media_key": null,
+              "obs_action": null,
+              "obs_target": null,
+              "audio_path": null,
+              "audio_volume": null,
+              "text_content": null,
+              "system_command": null,
+              "target_page": "Main",
+              "webhook_url": null,
+              "webhook_method": null,
+              "webhook_payload": null
+            }
+          ],
+          "is_toggle": false,
+          "color": 0,
+          "on_color": null,
+          "state": false,
+          "label": null,
+          "current_step": 0,
+          "is_sequence": false
+        },
+        "38": {
+          "actions": [],
+          "is_toggle": false,
+          "color": 0,
+          "on_color": null,
+          "state": false,
+          "label": null,
+          "current_step": 0,
+          "is_sequence": false
+        }
+      }
+    },
+    {
+      "name": "Test",
+      "mappings": {
+        "63": {
+          "actions": [
+            {
+              "type": "page",
+              "path": null,
+              "url": null,
+              "keys": null,
+              "delay_ms": null,
+              "midi_type": null,
+              "midi_note": null,
+              "midi_value": null,
+              "midi_channel": null,
+              "midi_device": null,
+              "media_key": null,
+              "obs_action": null,
+              "obs_target": null,
+              "audio_path": null,
+              "audio_volume": null,
+              "text_content": null,
+              "system_command": null,
+              "target_page": "Main",
+              "webhook_url": null,
+              "webhook_method": null,
+              "webhook_payload": null
+            }
+          ],
+          "is_toggle": false,
+          "color": 0,
+          "on_color": null,
+          "state": false,
+          "label": null,
+          "current_step": 0,
+          "is_sequence": false
         }
       }
     }
   ],
-  "active_page": "Main",
+  "active_page": "Test",
   "fader_mappings": {},
   "obs": {
     "host": "localhost",
@@ -76,5 +167,18 @@
     "password": null,
     "auto_connect": false
   },
-  "config_url": ""
+  "config_url": "",
+  "smart_profiles_enabled": false,
+  "smart_profiles": [],
+  "web_companion_enabled": false,
+  "web_companion_port": 1421,
+  "obs_peak_meter_enabled": false,
+  "obs_peak_meter_source": null,
+  "obs_peak_meter_column": null,
+  "ripple_effect_enabled": false,
+  "media_progress_enabled": false,
+  "media_progress_row": 0,
+  "media_control_note": 112,
+  "discord_mute_note": 113,
+  "discord_deafen_note": 114
 }
