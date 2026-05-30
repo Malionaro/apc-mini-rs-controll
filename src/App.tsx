@@ -45,6 +45,7 @@ function App() {
     let unlistenMidi: (() => void) | undefined;
     let unlistenStatus: (() => void) | undefined;
     let unlistenObsStatus: (() => void) | undefined;
+    let unlistenActivePage: (() => void) | undefined;
 
     const setup = async () => {
       await loadConfig();
@@ -92,6 +93,16 @@ function App() {
       unlistenObsStatus = await listen<boolean>("obs-connection-status", (event) => {
         setIsObsConnected(event.payload);
       });
+
+      unlistenActivePage = await listen<string>("active-page-changed", (event) => {
+        setConfig((prevConfig) => {
+          if (!prevConfig) return prevConfig;
+          if (!prevConfig.pages.some((page) => page.name === event.payload)) return prevConfig;
+          return { ...prevConfig, active_page: event.payload };
+        });
+        setSelectedNote(null);
+        setSelectedFader(null);
+      });
     };
 
     void setup();
@@ -101,6 +112,7 @@ function App() {
       unlistenMidi?.();
       unlistenStatus?.();
       unlistenObsStatus?.();
+      unlistenActivePage?.();
     };
   }, [isSettingsWindow, isLogsWindow]);
 
@@ -313,7 +325,7 @@ function App() {
         midi_channel: undefined,
         midi_device: type === "midi" ? currentAction.midi_device || "" : undefined,
         media_key: type === "media" ? value : undefined,
-        obs_action: type === "obs" ? currentAction.obs_action || "scene" : undefined,
+        obs_action: type === "obs" ? currentAction.obs_action || "SetScene" : undefined,
         obs_target: type.startsWith("obs") ? value : undefined,
         audio_path: type === "audio" ? value : undefined,
         audio_volume: type === "audio" ? currentAction.audio_volume || 100 : undefined,

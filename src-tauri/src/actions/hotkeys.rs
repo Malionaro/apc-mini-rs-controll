@@ -1,4 +1,4 @@
-use enigo::{Enigo, Key, Keyboard, Settings, Direction};
+use enigo::{Direction, Enigo, Key, Keyboard, Settings};
 
 pub fn parse_command_line(s: &str) -> Vec<String> {
     let mut args = Vec::new();

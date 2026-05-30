@@ -134,7 +134,8 @@ fn serve_config(mut stream: TcpStream, state: Arc<MidiState>) {
         config_json
     );
     let _ = stream.write_all(response.as_bytes());
-}fn serve_html(mut stream: TcpStream, state: Arc<MidiState>) {
+}
+fn serve_html(mut stream: TcpStream, state: Arc<MidiState>) {
     let active_page_name = { state.config.lock().unwrap().active_page.clone() };
 
     let html_template = r##"<!DOCTYPE html>

@@ -11,31 +11,31 @@ pub struct Action {
     pub url: Option<String>,
     pub keys: Option<Vec<String>>,
     pub delay_ms: Option<u64>,
-    
+
     // MIDI Felder
     pub midi_type: Option<String>,
     pub midi_note: Option<u8>,
     pub midi_value: Option<u8>,
     pub midi_channel: Option<u8>,
     pub midi_device: Option<String>,
-    
+
     // Media Felder
     pub media_key: Option<String>,
-    
+
     // OBS Felder
     pub obs_action: Option<String>,
     pub obs_target: Option<String>,
-    
+
     // Audio/Soundboard
     pub audio_path: Option<String>,
     pub audio_volume: Option<f32>,
-    
+
     // Text Inserter
     pub text_content: Option<String>,
-    
+
     // System
     pub system_command: Option<String>, // "Lock", "Shutdown", "WindowNextMonitor", "ToggleAlwaysOnTop"
-    
+
     // Navigation
     pub target_page: Option<String>,
 
@@ -88,8 +88,12 @@ pub struct ObsConfig {
     pub auto_connect: bool,
 }
 
-fn default_obs_host() -> String { "localhost".to_string() }
-fn default_obs_port() -> u16 { 4455 }
+fn default_obs_host() -> String {
+    "localhost".to_string()
+}
+fn default_obs_port() -> u16 {
+    4455
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Page {
@@ -143,20 +147,37 @@ pub struct AppConfig {
     pub discord_deafen_note: u8, // Standard: 114 (side key 3)
 }
 
-fn default_device_name() -> String { "APC mini mk2".to_string() }
-fn default_page_name() -> String { "Main".to_string() }
-fn default_web_companion_enabled() -> bool { false }
-fn default_web_companion_port() -> u16 { 1421 }
-fn default_media_control_note() -> u8 { 112 }
-fn default_discord_mute_note() -> u8 { 113 }
-fn default_discord_deafen_note() -> u8 { 114 }
+fn default_device_name() -> String {
+    "APC mini mk2".to_string()
+}
+fn default_page_name() -> String {
+    "Main".to_string()
+}
+fn default_web_companion_enabled() -> bool {
+    false
+}
+fn default_web_companion_port() -> u16 {
+    1421
+}
+fn default_media_control_note() -> u8 {
+    112
+}
+fn default_discord_mute_note() -> u8 {
+    113
+}
+fn default_discord_deafen_note() -> u8 {
+    114
+}
 
 impl Default for AppConfig {
     fn default() -> Self {
         Self {
             device_name: default_device_name(),
             output_device_name: String::new(),
-            pages: vec![Page { name: default_page_name(), mappings: HashMap::new() }],
+            pages: vec![Page {
+                name: default_page_name(),
+                mappings: HashMap::new(),
+            }],
             active_page: default_page_name(),
             fader_mappings: HashMap::new(),
             obs: ObsConfig::default(),
@@ -189,6 +210,29 @@ impl Default for ObsConfig {
     }
 }
 
+pub fn normalize_config(mut config: AppConfig) -> AppConfig {
+    if config.pages.is_empty() {
+        config.pages.push(Page {
+            name: default_page_name(),
+            mappings: HashMap::new(),
+        });
+    }
+
+    if !config
+        .pages
+        .iter()
+        .any(|page| page.name == config.active_page)
+    {
+        config.active_page = config
+            .pages
+            .first()
+            .map(|page| page.name.clone())
+            .unwrap_or_else(default_page_name);
+    }
+
+    config
+}
+
 pub fn get_config_path() -> PathBuf {
     let mut path = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
     path.push("streamdeck_config.json");
@@ -214,7 +258,10 @@ pub fn load_config() -> AppConfig {
                         return AppConfig {
                             device_name: legacy.device_name,
                             output_device_name: String::new(),
-                            pages: vec![Page { name: "Main".to_string(), mappings: legacy.mappings }],
+                            pages: vec![Page {
+                                name: "Main".to_string(),
+                                mappings: legacy.mappings,
+                            }],
                             active_page: "Main".to_string(),
                             fader_mappings: legacy.fader_mappings,
                             obs: legacy.obs,
@@ -235,7 +282,7 @@ pub fn load_config() -> AppConfig {
                         };
                     }
                 }
-                return config;
+                return normalize_config(config);
             }
         }
     }
@@ -244,6 +291,7 @@ pub fn load_config() -> AppConfig {
 
 pub fn save_config(config: &AppConfig) -> Result<(), String> {
     let path = get_config_path();
-    let json = serde_json::to_string_pretty(config).map_err(|e| e.to_string())?;
+    let normalized = normalize_config(config.clone());
+    let json = serde_json::to_string_pretty(&normalized).map_err(|e| e.to_string())?;
     fs::write(&path, json).map_err(|e| e.to_string())
 }

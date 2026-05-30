@@ -1,6 +1,6 @@
-use enigo::{Enigo, Key, Direction, Settings, Keyboard};
-use std::process::Command;
 use crate::actions::hotkeys::trigger_hotkey;
+use enigo::{Direction, Enigo, Key, Keyboard, Settings};
+use std::process::Command;
 
 pub fn trigger_media(k: &str) {
     let k_string = k.to_string();
@@ -28,16 +28,10 @@ pub fn trigger_system(c: &str) {
                 .spawn();
         }
         "Shutdown" => {
-            let _ = Command::new("shutdown")
-                .args(&["/s", "/t", "0"])
-                .spawn();
+            let _ = Command::new("shutdown").args(&["/s", "/t", "0"]).spawn();
         }
         "Screenshot" => {
-            trigger_hotkey(&[
-                "win".to_string(),
-                "shift".to_string(),
-                "s".to_string(),
-            ]);
+            trigger_hotkey(&["win".to_string(), "shift".to_string(), "s".to_string()]);
         }
         _ => {}
     }
@@ -47,7 +41,7 @@ pub fn trigger_mouse(action: &str, target: &str) {
     let action_str = action.to_string();
     let target_str = target.to_string();
     std::thread::spawn(move || {
-        use enigo::{Enigo, Button, Direction, Coordinate, Axis, Mouse, Settings};
+        use enigo::{Axis, Button, Coordinate, Direction, Enigo, Mouse, Settings};
         if let Ok(mut e) = Enigo::new(&Settings::default()) {
             match action_str.as_str() {
                 "mouse_click" => {

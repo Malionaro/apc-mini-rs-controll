@@ -19,9 +19,15 @@ pub fn handle_fader_move(cc: u8, val: u8, state: &Arc<MidiState>) {
     } else {
         return;
     };
-    
+
     let mapping = {
-        state.config.lock().unwrap().fader_mappings.get(&fader_idx.to_string()).cloned()
+        state
+            .config
+            .lock()
+            .unwrap()
+            .fader_mappings
+            .get(&fader_idx.to_string())
+            .cloned()
     };
 
     if let Some(m) = mapping {
@@ -47,20 +53,18 @@ pub fn handle_fader_move(cc: u8, val: u8, state: &Arc<MidiState>) {
 
 pub fn set_app_volume(process_name: &str, volume: f32) {
     let target_lower = process_name.to_lowercase();
-    std::thread::spawn(move || {
-        unsafe {
-            let winmix = winmix::WinMix::default();
-            if let Ok(sessions) = winmix.enumerate() {
-                for session in sessions {
-                    let path = session.path;
-                    let filename = std::path::Path::new(&path)
-                        .file_name()
-                        .unwrap_or_default()
-                        .to_string_lossy()
-                        .to_lowercase();
-                    if filename == target_lower || filename.replace(".exe", "") == target_lower {
-                        let _ = session.vol.set_master_volume(volume);
-                    }
+    std::thread::spawn(move || unsafe {
+        let winmix = winmix::WinMix::default();
+        if let Ok(sessions) = winmix.enumerate() {
+            for session in sessions {
+                let path = session.path;
+                let filename = std::path::Path::new(&path)
+                    .file_name()
+                    .unwrap_or_default()
+                    .to_string_lossy()
+                    .to_lowercase();
+                if filename == target_lower || filename.replace(".exe", "") == target_lower {
+                    let _ = session.vol.set_master_volume(volume);
                 }
             }
         }

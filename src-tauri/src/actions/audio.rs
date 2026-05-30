@@ -1,8 +1,8 @@
+use rodio::{Decoder, OutputStream, Sink};
 use std::fs::File;
 use std::io::BufReader;
-use std::thread;
 use std::sync::{Arc, Mutex, OnceLock};
-use rodio::{Decoder, OutputStream, Sink};
+use std::thread;
 
 fn get_active_sinks() -> &'static Mutex<Vec<Arc<Sink>>> {
     static SINKS: OnceLock<Mutex<Vec<Arc<Sink>>>> = OnceLock::new();
@@ -17,15 +17,15 @@ pub fn play_sound(path: String, volume: f32) {
                     if let Ok(sink) = Sink::try_new(&handle) {
                         sink.set_volume(volume);
                         sink.append(s);
-                        
+
                         let sink_arc = Arc::new(sink);
                         {
                             let mut sinks = get_active_sinks().lock().unwrap();
                             sinks.push(sink_arc.clone());
                         }
-                        
+
                         sink_arc.sleep_until_end();
-                        
+
                         let mut sinks = get_active_sinks().lock().unwrap();
                         sinks.retain(|x| !Arc::ptr_eq(x, &sink_arc));
                     }

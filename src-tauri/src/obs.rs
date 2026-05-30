@@ -1,11 +1,11 @@
-use obws::Client;
+use futures_util::StreamExt;
 use obws::events::Event;
-use obws::requests::scene_items::SetEnabled;
 use obws::requests::inputs::{InputId, Volume};
+use obws::requests::scene_items::SetEnabled;
+use obws::Client;
 use std::sync::{Arc, Mutex};
 use tokio::runtime::Runtime;
 use tokio::sync::broadcast;
-use futures_util::StreamExt;
 
 pub struct ObsState {
     client: Arc<Mutex<Option<Arc<Client>>>>,
@@ -31,7 +31,7 @@ impl ObsState {
         let host = host.to_string();
         let client_clone = self.client.clone();
         let event_tx = self.event_tx.clone();
-        
+
         self.rt.block_on(async move {
             let connect_future = Client::connect(host, port, password);
             match tokio::time::timeout(std::time::Duration::from_secs(3), connect_future).await {
@@ -63,29 +63,68 @@ impl ObsState {
 
         self.rt.spawn(async move {
             match action.as_str() {
-                "SetScene" => { let _ = client.scenes().set_current_program_scene(target_str.as_str()).await; }
-                "SetPreviewScene" => { let _ = client.scenes().set_current_preview_scene(target_str.as_str()).await; }
+                "SetScene" => {
+                    let _ = client
+                        .scenes()
+                        .set_current_program_scene(target_str.as_str())
+                        .await;
+                }
+                "SetPreviewScene" => {
+                    let _ = client
+                        .scenes()
+                        .set_current_preview_scene(target_str.as_str())
+                        .await;
+                }
                 "ToggleStudioMode" => {
                     if let Ok(enabled) = client.ui().studio_mode_enabled().await {
                         let _ = client.ui().set_studio_mode_enabled(!enabled).await;
                     }
                 }
-                "Transition" => { let _ = client.transitions().trigger().await; }
-                "ToggleMute" => { let _ = client.inputs().toggle_mute(obws::requests::inputs::InputId::Name(target_str.as_str())).await; }
-                "StartStopStream" => { let _ = client.streaming().toggle().await; }
-                "StartStopRecord" => { let _ = client.recording().toggle().await; }
+                "Transition" => {
+                    let _ = client.transitions().trigger().await;
+                }
+                "ToggleMute" => {
+                    let _ = client
+                        .inputs()
+                        .toggle_mute(obws::requests::inputs::InputId::Name(target_str.as_str()))
+                        .await;
+                }
+                "StartStopStream" => {
+                    let _ = client.streaming().toggle().await;
+                }
+                "StartStopRecord" => {
+                    let _ = client.recording().toggle().await;
+                }
                 "ToggleSource" => {
                     // target_str format: "SceneName|SourceName"
                     let parts: Vec<&str> = target_str.split('|').collect();
                     if parts.len() == 2 {
-                        if let Ok(items) = client.scene_items().list(obws::requests::canvases::SceneId::Name(parts[0])).await {
-                            if let Some(item) = items.into_iter().find(|i| i.source_name == parts[1]) {
-                                if let Ok(enabled) = client.scene_items().enabled(obws::requests::canvases::SceneId::Name(parts[0]), item.id).await {
-                                    let _ = client.scene_items().set_enabled(SetEnabled {
-                                        scene: obws::requests::canvases::SceneId::Name(parts[0]),
-                                        item_id: item.id,
-                                        enabled: !enabled,
-                                    }).await;
+                        if let Ok(items) = client
+                            .scene_items()
+                            .list(obws::requests::canvases::SceneId::Name(parts[0]))
+                            .await
+                        {
+                            if let Some(item) =
+                                items.into_iter().find(|i| i.source_name == parts[1])
+                            {
+                                if let Ok(enabled) = client
+                                    .scene_items()
+                                    .enabled(
+                                        obws::requests::canvases::SceneId::Name(parts[0]),
+                                        item.id,
+                                    )
+                                    .await
+                                {
+                                    let _ = client
+                                        .scene_items()
+                                        .set_enabled(SetEnabled {
+                                            scene: obws::requests::canvases::SceneId::Name(
+                                                parts[0],
+                                            ),
+                                            item_id: item.id,
+                                            enabled: !enabled,
+                                        })
+                                        .await;
                                 }
                             }
                         }
@@ -97,7 +136,10 @@ impl ObsState {
                     if parts.len() == 2 {
                         if let Ok(vol) = parts[1].parse::<f32>() {
                             let pct = vol.clamp(0.1, 100.0) / 100.0;
-                            let _ = client.inputs().set_volume(InputId::Name(parts[0]), Volume::Mul(pct)).await;
+                            let _ = client
+                                .inputs()
+                                .set_volume(InputId::Name(parts[0]), Volume::Mul(pct))
+                                .await;
                         }
                     }
                 }
@@ -105,12 +147,19 @@ impl ObsState {
                     // target_str format: "SourceName|FilterName"
                     let parts: Vec<&str> = target_str.split('|').collect();
                     if parts.len() == 2 {
-                        if let Ok(filter) = client.filters().get(obws::requests::sources::SourceId::Name(parts[0]), parts[1]).await {
-                            let _ = client.filters().set_enabled(obws::requests::filters::SetEnabled {
-                                source: obws::requests::sources::SourceId::Name(parts[0]),
-                                filter: parts[1],
-                                enabled: !filter.enabled,
-                            }).await;
+                        if let Ok(filter) = client
+                            .filters()
+                            .get(obws::requests::sources::SourceId::Name(parts[0]), parts[1])
+                            .await
+                        {
+                            let _ = client
+                                .filters()
+                                .set_enabled(obws::requests::filters::SetEnabled {
+                                    source: obws::requests::sources::SourceId::Name(parts[0]),
+                                    filter: parts[1],
+                                    enabled: !filter.enabled,
+                                })
+                                .await;
                         }
                     }
                 }
@@ -118,24 +167,35 @@ impl ObsState {
                     // target_str format: "SceneName|SourceName|1/0"
                     let parts: Vec<&str> = target_str.split('|').collect();
                     if parts.len() == 3 {
-                        if let Ok(items) = client.scene_items().list(obws::requests::canvases::SceneId::Name(parts[0])).await {
-                            if let Some(item) = items.into_iter().find(|i| i.source_name == parts[1]) {
-                                let _ = client.scene_items().set_enabled(SetEnabled {
-                                    scene: obws::requests::canvases::SceneId::Name(parts[0]),
-                                    item_id: item.id,
-                                    enabled: parts[2] == "1",
-                                }).await;
+                        if let Ok(items) = client
+                            .scene_items()
+                            .list(obws::requests::canvases::SceneId::Name(parts[0]))
+                            .await
+                        {
+                            if let Some(item) =
+                                items.into_iter().find(|i| i.source_name == parts[1])
+                            {
+                                let _ = client
+                                    .scene_items()
+                                    .set_enabled(SetEnabled {
+                                        scene: obws::requests::canvases::SceneId::Name(parts[0]),
+                                        item_id: item.id,
+                                        enabled: parts[2] == "1",
+                                    })
+                                    .await;
                             }
                         }
                     }
                 }
-                "ReplayBuffer" => {
-                    match target_str.as_str() {
-                        "toggle" => { let _ = client.replay_buffer().toggle().await; }
-                        "save" => { let _ = client.replay_buffer().save().await; }
-                        _ => {}
+                "ReplayBuffer" => match target_str.as_str() {
+                    "toggle" => {
+                        let _ = client.replay_buffer().toggle().await;
                     }
-                }
+                    "save" => {
+                        let _ = client.replay_buffer().save().await;
+                    }
+                    _ => {}
+                },
                 _ => {}
             }
         });
@@ -157,7 +217,11 @@ impl ObsState {
         let client = client_lock.as_ref().ok_or("OBS Offline")?;
 
         self.rt.block_on(async {
-            let inputs = client.inputs().list(None).await.map_err(|e| e.to_string())?;
+            let inputs = client
+                .inputs()
+                .list(None)
+                .await
+                .map_err(|e| e.to_string())?;
             Ok(inputs.into_iter().map(|i| i.id.name).collect())
         })
     }
@@ -167,7 +231,11 @@ impl ObsState {
         let client = client_lock.as_ref().ok_or("OBS Offline")?;
 
         self.rt.block_on(async {
-            let items = client.scene_items().list(obws::requests::canvases::SceneId::Name(scene)).await.map_err(|e| e.to_string())?;
+            let items = client
+                .scene_items()
+                .list(obws::requests::canvases::SceneId::Name(scene))
+                .await
+                .map_err(|e| e.to_string())?;
             Ok(items.into_iter().map(|i| i.source_name).collect())
         })
     }
@@ -177,16 +245,28 @@ impl ObsState {
         let client = client_lock.as_ref().ok_or("OBS Offline")?;
 
         self.rt.block_on(async {
-            let filters = client.filters().list(obws::requests::sources::SourceId::Name(source)).await.map_err(|e| e.to_string())?;
+            let filters = client
+                .filters()
+                .list(obws::requests::sources::SourceId::Name(source))
+                .await
+                .map_err(|e| e.to_string())?;
             Ok(filters.into_iter().map(|f| f.name).collect())
         })
     }
 
-    pub async fn resolve_scene_item_name(&self, scene: &str, item_id: i64) -> Result<String, String> {
+    pub async fn resolve_scene_item_name(
+        &self,
+        scene: &str,
+        item_id: i64,
+    ) -> Result<String, String> {
         let client_opt = self.client.lock().unwrap().clone();
         let client = client_opt.ok_or("OBS Offline")?;
-        
-        let items = client.scene_items().list(obws::requests::canvases::SceneId::Name(scene)).await.map_err(|e| e.to_string())?;
+
+        let items = client
+            .scene_items()
+            .list(obws::requests::canvases::SceneId::Name(scene))
+            .await
+            .map_err(|e| e.to_string())?;
         if let Some(item) = items.into_iter().find(|i| i.id == item_id) {
             Ok(item.source_name)
         } else {
